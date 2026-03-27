@@ -5,13 +5,11 @@ import {
   Package, 
   Users, 
   History, 
-  Settings, 
-  Download,
-  LogOut 
+  Download
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { downloadBackup, clearAllData } from '@/lib/storage';
+import { downloadBackup } from '@/lib/storage';
 
 interface SidebarNavProps {
   activeTab: string;
@@ -63,19 +61,6 @@ export function SidebarNav({ activeTab, setActiveTab }: SidebarNavProps) {
         >
           <Download className="w-5 h-5" />
           Export Data
-        </Button>
-        <Button 
-          variant="ghost" 
-          className="w-full justify-start gap-3 rounded-xl text-destructive hover:bg-destructive/10"
-          onClick={() => {
-            if (confirm('Are you sure you want to clear all business data? This cannot be undone.')) {
-              clearAllData();
-              window.location.reload();
-            }
-          }}
-        >
-          <LogOut className="w-5 h-5" />
-          Clear Business
         </Button>
       </div>
     </div>

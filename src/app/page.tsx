@@ -19,7 +19,6 @@ export default function Home() {
     isLoading,
     updateBusiness,
     addProduct,
-    updateProduct,
     addCustomer,
     addTransaction,
     updateTransaction
@@ -64,6 +63,7 @@ export default function Home() {
           {activeTab === 'customers' && (
             <CustomerManagement 
               customers={customers} 
+              transactions={transactions}
               onAddCustomer={addCustomer} 
             />
           )}
