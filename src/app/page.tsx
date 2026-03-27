@@ -64,7 +64,9 @@ export default function Home() {
             <CustomerManagement 
               customers={customers} 
               transactions={transactions}
+              products={products}
               onAddCustomer={addCustomer} 
+              onAddTransaction={addTransaction}
             />
           )}
 

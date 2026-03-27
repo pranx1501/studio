@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Search, Phone, UserPlus, User, ShoppingBag, History, Upload, Calculator } from 'lucide-react';
+import { Plus, Search, Phone, UserPlus, User, ShoppingBag, History, Upload } from 'lucide-react';
 
 interface CustomerManagementProps {
   customers: Customer[];
@@ -66,7 +66,7 @@ export function CustomerManagement({
 
   const calculateCartTotal = () => {
     return selectedItems.reduce((acc, curr) => {
-      const p = products.find(prod => prod.id === curr.productId);
+      const p = products?.find(prod => prod.id === curr.productId);
       return acc + (p?.price || 0) * curr.quantity;
     }, 0);
   };
@@ -86,7 +86,7 @@ export function CustomerManagement({
         customerId: customerId,
         customerName: customer.name,
         items: selectedItems.map(i => {
-          const p = products.find(prod => prod.id === i.productId)!;
+          const p = products?.find(prod => prod.id === i.productId)!;
           return { productId: p.id, name: p.name, quantity: i.quantity, price: p.price };
         }),
         totalAmount: total,
@@ -110,7 +110,7 @@ export function CustomerManagement({
       customerId: customer.id,
       customerName: customer.name,
       items: selectedItems.map(i => {
-        const p = products.find(prod => prod.id === i.productId)!;
+        const p = products?.find(prod => prod.id === i.productId)!;
         return { productId: p.id, name: p.name, quantity: i.quantity, price: p.price };
       }),
       totalAmount: total,
@@ -240,7 +240,7 @@ export function CustomerManagement({
                     <div className="space-y-2">
                       <Label className="flex items-center gap-2">Inventory</Label>
                       <ScrollArea className="h-64 border rounded-xl p-2 bg-muted/20">
-                        {products.map(p => (
+                        {products?.map(p => (
                           <div key={p.id} className="flex items-center justify-between p-2 rounded-lg bg-white border mb-2 text-sm">
                             <span className="font-medium">{p.name} - ₹{p.price}</span>
                             <Button size="sm" variant="ghost" onClick={() => handleAddItemToCart(p.id)} className="h-7 w-7 p-0 rounded-full hover:bg-primary hover:text-white">
@@ -254,7 +254,7 @@ export function CustomerManagement({
                       <Label>Selected Items</Label>
                       <ScrollArea className="h-64 border rounded-xl p-2 bg-white">
                         {selectedItems.map(item => {
-                          const p = products.find(prod => prod.id === item.productId)!;
+                          const p = products?.find(prod => prod.id === item.productId)!;
                           return (
                             <div key={item.productId} className="flex justify-between text-xs py-1 border-b mb-1">
                               <span>{p.name} (x{item.quantity})</span>
@@ -396,7 +396,7 @@ export function CustomerManagement({
                           <div className="grid grid-cols-2 gap-4">
                             <ScrollArea className="h-56 border rounded-xl p-2">
                               <Label className="px-2 pb-2 block text-[10px] uppercase font-bold text-muted-foreground">Product List</Label>
-                              {products.map(p => (
+                              {products?.map(p => (
                                 <div key={p.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/20 border mb-1 text-xs">
                                   <span>{p.name}</span>
                                   <Button size="sm" variant="ghost" onClick={() => handleAddItemToCart(p.id)} className="h-6 w-6 p-0 rounded-full">
@@ -408,7 +408,7 @@ export function CustomerManagement({
                             <ScrollArea className="h-56 border rounded-xl p-2 bg-white">
                               <Label className="px-2 pb-2 block text-[10px] uppercase font-bold text-muted-foreground">Current Selection</Label>
                               {selectedItems.map(item => {
-                                const p = products.find(prod => prod.id === item.productId)!;
+                                const p = products?.find(prod => prod.id === item.productId)!;
                                 return (
                                   <div key={item.productId} className="flex justify-between text-xs py-1 border-b">
                                     <span>{p.name} (x{item.quantity})</span>
