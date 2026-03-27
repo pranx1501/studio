@@ -5,10 +5,11 @@ import { Product } from '@/lib/storage';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Search, Image as ImageIcon, Sparkles, Wand2, Loader2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Plus, Search, Image as ImageIcon, Sparkles, Loader2, Package } from 'lucide-react';
 import { aiProductDescriptionGenerator } from '@/ai/flows/ai-product-description-generator-flow';
 import { useToast } from '@/hooks/use-toast';
 
@@ -50,7 +51,13 @@ export function ProductManagement({ products, onAddProduct }: ProductManagementP
       setNewProduct(prev => ({ ...prev, description: res.description }));
       toast({ title: "AI Generated", description: "Product description refined." });
     } catch (e) {
-      toast({ title: "AI Error", description: "Failed to generate description.", variant: "destructive" });
+      toast({ 
+        title: "AI Service Unavailable", 
+        description: "Configure your API key in the environment variables to use AI features. Falling back to default description.", 
+        variant: "destructive" 
+      });
+      // Graceful fallback for demo purposes if API key is missing
+      setNewProduct(prev => ({ ...prev, description: `A high-quality ${prev.name || 'product'} perfect for your needs.` }));
     } finally {
       setIsGeneratingAI(false);
     }
@@ -74,7 +81,7 @@ export function ProductManagement({ products, onAddProduct }: ProductManagementP
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-primary font-headline">Products</h2>
-          <p className="text-muted-foreground">Manage your unlimited inventory and categories.</p>
+          <p className="text-muted-foreground">Manage your inventory and categories.</p>
         </div>
         <div className="flex gap-2 w-full md:w-auto">
           <div className="relative flex-1 md:w-64">
@@ -96,7 +103,7 @@ export function ProductManagement({ products, onAddProduct }: ProductManagementP
             <DialogContent className="sm:max-w-[600px] rounded-3xl">
               <DialogHeader>
                 <DialogTitle className="text-2xl font-bold flex items-center gap-2">
-                  <PackageIcon className="w-6 h-6 text-primary" />
+                  <Package className="w-6 h-6 text-primary" />
                   New Product
                 </DialogTitle>
               </DialogHeader>
@@ -107,7 +114,7 @@ export function ProductManagement({ products, onAddProduct }: ProductManagementP
                     <Input id="prod_name" value={newProduct.name} onChange={(e) => setNewProduct({...newProduct, name: e.target.value})} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="prod_price">Price ($)</Label>
+                    <Label htmlFor="prod_price">Price (₹)</Label>
                     <Input id="prod_price" type="number" value={newProduct.price} onChange={(e) => setNewProduct({...newProduct, price: parseFloat(e.target.value)})} />
                   </div>
                 </div>
@@ -161,7 +168,7 @@ export function ProductManagement({ products, onAddProduct }: ProductManagementP
               />
               <div className="absolute top-2 right-2">
                 <Badge className="bg-white/90 text-primary hover:bg-white backdrop-blur-md shadow-sm border-none">
-                  ${product.price}
+                  ₹{product.price}
                 </Badge>
               </div>
             </div>
@@ -186,14 +193,5 @@ export function ProductManagement({ products, onAddProduct }: ProductManagementP
         )}
       </div>
     </div>
-  );
-}
-
-function PackageIcon({ className }: { className?: string }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>
-      <polyline points="3.29 7 12 12 20.71 7"/><line x1="12" y1="22" x2="12" y2="12"/>
-    </svg>
   );
 }

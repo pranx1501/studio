@@ -3,7 +3,7 @@
 import { BusinessInfo, Product, Customer, Transaction } from '@/lib/storage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, User, Package, Users, Wallet, TrendingUp } from 'lucide-react';
+import { MapPin, User, Package, Users, Wallet, TrendingUp, History } from 'lucide-react';
 
 interface OverviewProps {
   business: BusinessInfo;
@@ -57,7 +57,7 @@ export function Overview({ business, products, customers, transactions }: Overvi
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
           title="Revenue" 
-          value={`$${totalRevenue.toLocaleString()}`} 
+          value={`₹${totalRevenue.toLocaleString()}`} 
           icon={TrendingUp} 
           subtitle="Total paid transactions"
           color="text-green-500"
@@ -65,7 +65,7 @@ export function Overview({ business, products, customers, transactions }: Overvi
         />
         <StatCard 
           title="Pending" 
-          value={`$${pendingAmount.toLocaleString()}`} 
+          value={`₹${pendingAmount.toLocaleString()}`} 
           icon={Wallet} 
           subtitle="Awaiting payment"
           color="text-amber-500"
@@ -94,7 +94,7 @@ export function Overview({ business, products, customers, transactions }: Overvi
         <Card className="rounded-2xl border-none shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg font-bold flex items-center gap-2">
-              <HistoryIcon className="w-5 h-5 text-primary" />
+              <History className="w-5 h-5 text-primary" />
               Recent Transactions
             </CardTitle>
           </CardHeader>
@@ -107,7 +107,7 @@ export function Overview({ business, products, customers, transactions }: Overvi
                     <p className="text-xs text-muted-foreground">{new Date(tx.date).toLocaleDateString()}</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-primary">${tx.totalAmount}</p>
+                    <p className="font-bold text-primary">₹{tx.totalAmount}</p>
                     <Badge variant={tx.status === 'paid' ? 'default' : 'outline'} className="text-[10px]">
                       {tx.status.toUpperCase()}
                     </Badge>
@@ -151,21 +151,5 @@ function StatCard({ title, value, icon: Icon, subtitle, color, bg }: any) {
         </div>
       </CardContent>
     </Card>
-  );
-}
-
-function HistoryIcon({ className }: { className?: string }) {
-  return (
-    <svg 
-      xmlns="http://www.w3.org/2000/svg" 
-      width="24" height="24" viewBox="0 0 24 24" 
-      fill="none" stroke="currentColor" strokeWidth="2" 
-      strokeLinecap="round" strokeLinejoin="round" 
-      className={className}
-    >
-      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-      <path d="M3 3v5h5"/>
-      <path d="M12 7v5l4 2"/>
-    </svg>
   );
 }

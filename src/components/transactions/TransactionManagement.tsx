@@ -9,7 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, Receipt, Calculator, ChevronRight, DollarSign } from 'lucide-react';
+import { Search, Receipt, Calculator, IndianRupee, Plus } from 'lucide-react';
 
 interface TransactionManagementProps {
   transactions: Transaction[];
@@ -81,7 +81,7 @@ export function TransactionManagement({
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-primary font-headline">Transactions</h2>
-          <p className="text-muted-foreground">Log sales, track pending payments, and receipts.</p>
+          <p className="text-muted-foreground">Log sales and track payments.</p>
         </div>
         <div className="flex gap-2 w-full md:w-auto">
           <div className="relative flex-1 md:w-64">
@@ -125,7 +125,7 @@ export function TransactionManagement({
                     <div className="h-64 overflow-y-auto pr-2 space-y-2 custom-scrollbar">
                       {products.map(p => (
                         <div key={p.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50 text-sm">
-                          <span>{p.name} - ${p.price}</span>
+                          <span>{p.name} - ₹{p.price}</span>
                           <Button size="sm" variant="ghost" onClick={() => handleAddItem(p.id)} className="h-8 w-8 p-0 rounded-full hover:bg-primary hover:text-white">
                             <Plus className="w-4 h-4" />
                           </Button>
@@ -144,7 +144,7 @@ export function TransactionManagement({
                         return (
                           <div key={item.productId} className="flex justify-between text-sm">
                             <span>{p.name} (x{item.quantity})</span>
-                            <span className="font-bold">${p.price * item.quantity}</span>
+                            <span className="font-bold">₹{p.price * item.quantity}</span>
                           </div>
                         );
                       })}
@@ -152,10 +152,10 @@ export function TransactionManagement({
                       <div className="pt-4 border-t mt-auto">
                         <div className="flex justify-between text-lg font-bold text-primary">
                           <span>Total</span>
-                          <span>${total}</span>
+                          <span>₹{total}</span>
                         </div>
                         <div className="mt-4 space-y-2">
-                          <Label htmlFor="paid_amt" className="text-xs">Initial Payment Received ($)</Label>
+                          <Label htmlFor="paid_amt" className="text-xs">Initial Payment Received (₹)</Label>
                           <Input 
                             id="paid_amt" 
                             type="number" 
@@ -196,11 +196,11 @@ export function TransactionManagement({
                 <div className="flex flex-wrap gap-4 items-center w-full md:w-auto">
                   <div className="text-right flex-1 md:flex-none">
                     <p className="text-xs text-muted-foreground">Pending Amount</p>
-                    <p className="font-bold text-amber-600">${tx.totalAmount - tx.paidAmount}</p>
+                    <p className="font-bold text-amber-600">₹{tx.totalAmount - tx.paidAmount}</p>
                   </div>
                   <div className="text-right flex-1 md:flex-none">
                     <p className="text-xs text-muted-foreground">Total Sale</p>
-                    <p className="font-bold text-primary text-xl">${tx.totalAmount}</p>
+                    <p className="font-bold text-primary text-xl">₹{tx.totalAmount}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant={tx.status === 'paid' ? 'default' : 'outline'} className="rounded-lg py-1 px-3 uppercase tracking-wider text-[10px]">
@@ -223,7 +223,7 @@ export function TransactionManagement({
                         }
                       }}
                     >
-                      <DollarSign className="w-4 h-4" />
+                      <IndianRupee className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
