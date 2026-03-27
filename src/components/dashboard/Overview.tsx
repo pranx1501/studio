@@ -3,7 +3,7 @@
 import { BusinessInfo, Product, Customer, Transaction } from '@/lib/storage';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, User, Package, Users, Wallet, TrendingUp, History } from 'lucide-react';
+import { MapPin, User, Package, Users, Wallet, TrendingUp, History, Star } from 'lucide-react';
 
 interface OverviewProps {
   business: BusinessInfo;
@@ -16,6 +16,18 @@ export function Overview({ business, products, customers, transactions }: Overvi
   const totalRevenue = transactions.reduce((acc, curr) => acc + curr.paidAmount, 0);
   const pendingAmount = transactions.reduce((acc, curr) => acc + (curr.totalAmount - curr.paidAmount), 0);
   
+  // Top Selling Products Calculation
+  const productSalesMap = new Map<string, number>();
+  transactions.forEach(tx => {
+    tx.items.forEach(item => {
+      productSalesMap.set(item.name, (productSalesMap.get(item.name) || 0) + item.quantity);
+    });
+  });
+
+  const topProducts = Array.from(productSalesMap.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Hero Branding Section */}
@@ -89,7 +101,7 @@ export function Overview({ business, products, customers, transactions }: Overvi
         />
       </div>
 
-      {/* Recent Activity */}
+      {/* Recent Activity & Top Selling */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <Card className="rounded-2xl border-none shadow-sm">
           <CardHeader>
@@ -122,12 +134,25 @@ export function Overview({ business, products, customers, transactions }: Overvi
         <Card className="rounded-2xl border-none shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg font-bold flex items-center gap-2">
-              <Package className="w-5 h-5 text-primary" />
-              Low Stock Alert
+              <Star className="w-5 h-5 text-accent" />
+              Top Selling Products
             </CardTitle>
           </CardHeader>
           <CardContent>
-             <p className="text-center py-8 text-muted-foreground italic">All inventory levels are looking healthy!</p>
+             <div className="space-y-4">
+               {topProducts.map(([name, quantity], idx) => (
+                 <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-secondary/30">
+                   <div className="flex items-center gap-3">
+                     <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center font-bold text-primary text-xs">
+                       #{idx + 1}
+                     </div>
+                     <span className="font-medium text-sm">{name}</span>
+                   </div>
+                   <Badge variant="secondary" className="font-bold">{quantity} sold</Badge>
+                 </div>
+               ))}
+               {topProducts.length === 0 && <p className="text-center py-8 text-muted-foreground italic">Start selling to see analytics!</p>}
+             </div>
           </CardContent>
         </Card>
       </div>

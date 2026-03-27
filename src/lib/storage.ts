@@ -33,13 +33,21 @@ export interface TransactionItem {
   price: number;
 }
 
+export interface PaymentRecord {
+  amount: number;
+  date: string;
+}
+
 export interface Transaction {
   id: string;
   customerId: string;
   customerName: string;
   items: TransactionItem[];
+  subtotal: number;
+  discount: number;
   totalAmount: number;
   paidAmount: number;
+  paymentHistory: PaymentRecord[];
   status: 'pending' | 'paid';
   date: string;
 }

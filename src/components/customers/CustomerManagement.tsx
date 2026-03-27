@@ -10,7 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Search, Phone, UserPlus, User, ShoppingBag, History, Upload } from 'lucide-react';
+import { Plus, Search, Phone, UserPlus, User, ShoppingBag, History, Upload, IndianRupee, Calendar } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface CustomerManagementProps {
   customers: Customer[];
@@ -32,6 +33,7 @@ export function CustomerManagement({
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
   
   // Registration State
   const [newCustomer, setNewCustomer] = useState<Partial<Customer>>({
@@ -81,6 +83,7 @@ export function CustomerManagement({
 
     if (selectedItems.length > 0) {
       const total = calculateCartTotal();
+      const date = new Date().toISOString();
       const transaction: Transaction = {
         id: Math.random().toString(36).substr(2, 9),
         customerId: customerId,
@@ -89,10 +92,13 @@ export function CustomerManagement({
           const p = products?.find(prod => prod.id === i.productId)!;
           return { productId: p.id, name: p.name, quantity: i.quantity, price: p.price };
         }),
+        subtotal: total,
+        discount: 0,
         totalAmount: total,
-        paidAmount: 0, // Assume pending initially
+        paidAmount: 0,
+        paymentHistory: [],
         status: 'pending',
-        date: new Date().toISOString(),
+        date,
       };
       onAddTransaction(transaction);
     }
@@ -101,10 +107,12 @@ export function CustomerManagement({
     setAddStep(1);
     setNewCustomer({ name: '', phone: '', imageUrl: '' });
     setSelectedItems([]);
+    toast({ title: "Customer Registered", description: "Relationship and initial order created." });
   };
 
   const handleAddMoreItems = (customer: Customer) => {
     const total = calculateCartTotal();
+    const date = new Date().toISOString();
     const transaction: Transaction = {
       id: Math.random().toString(36).substr(2, 9),
       customerId: customer.id,
@@ -113,14 +121,18 @@ export function CustomerManagement({
         const p = products?.find(prod => prod.id === i.productId)!;
         return { productId: p.id, name: p.name, quantity: i.quantity, price: p.price };
       }),
+      subtotal: total,
+      discount: 0,
       totalAmount: total,
       paidAmount: 0,
+      paymentHistory: [],
       status: 'pending',
-      date: new Date().toISOString(),
+      date,
     };
     onAddTransaction(transaction);
     setIsAddingItems(false);
     setSelectedItems([]);
+    toast({ title: "Items Added", description: `New order tracked for ${customer.name}.` });
   };
 
   const filtered = customers.filter(c => 
@@ -131,12 +143,14 @@ export function CustomerManagement({
   const getCustomerStats = (customerId: string) => {
     const customerTx = transactions.filter(t => t.customerId === customerId);
     const itemsMap = new Map<string, { name: string; quantity: number; total: number }>();
+    const payments: {amount: number, date: string}[] = [];
     let totalBilled = 0;
     let totalPaid = 0;
 
     customerTx.forEach(tx => {
       totalBilled += tx.totalAmount;
       totalPaid += tx.paidAmount;
+      if (tx.paymentHistory) payments.push(...tx.paymentHistory);
       tx.items.forEach(item => {
         const existing = itemsMap.get(item.productId);
         if (existing) {
@@ -157,7 +171,8 @@ export function CustomerManagement({
       totalBilled,
       totalPaid,
       balanceDue: totalBilled - totalPaid,
-      txCount: customerTx.length
+      txCount: customerTx.length,
+      paymentLogs: payments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     };
   };
 
@@ -166,7 +181,7 @@ export function CustomerManagement({
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-primary font-headline">Customers</h2>
-          <p className="text-muted-foreground">Manage relationships and order history.</p>
+          <p className="text-muted-foreground">Manage relationships and check payment timelines.</p>
         </div>
         <div className="flex gap-2 w-full md:w-auto">
           <div className="relative flex-1 md:w-64">
@@ -286,7 +301,7 @@ export function CustomerManagement({
           return (
             <Card 
               key={customer.id} 
-              className="rounded-2xl border-none shadow-sm hover:shadow-md transition-all cursor-pointer group"
+              className="rounded-3xl border-none shadow-sm hover:shadow-md transition-all cursor-pointer group"
               onClick={() => {
                 setSelectedCustomer(customer);
                 setSelectedItems([]);
@@ -317,12 +332,12 @@ export function CustomerManagement({
                 </div>
                 <div className="mt-4 flex gap-4 text-xs font-medium border-t pt-4">
                   <div className="flex flex-col">
-                    <span className="text-muted-foreground uppercase text-[10px]">Total Orders</span>
-                    <span className="text-primary">{stats.txCount}</span>
+                    <span className="text-muted-foreground uppercase text-[10px]">Orders</span>
+                    <span className="text-primary font-black">{stats.txCount}</span>
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-muted-foreground uppercase text-[10px]">Purchased Items</span>
-                    <span className="text-primary">{stats.items.reduce((acc, i) => acc + i.quantity, 0)}</span>
+                    <span className="text-muted-foreground uppercase text-[10px]">Total Value</span>
+                    <span className="text-primary font-black">₹{stats.totalBilled}</span>
                   </div>
                 </div>
               </CardContent>
@@ -338,124 +353,159 @@ export function CustomerManagement({
       </div>
 
       <Dialog open={!!selectedCustomer} onOpenChange={(open) => !open && setSelectedCustomer(null)}>
-        <DialogContent className="sm:max-w-[600px] rounded-3xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
+        <DialogContent className="sm:max-w-[700px] rounded-[2.5rem] max-h-[90vh] flex flex-col p-0 overflow-hidden border-none shadow-2xl">
           {selectedCustomer && (
             <>
-              <div className="p-6 bg-primary text-white">
-                <div className="flex items-center gap-4">
-                  <Avatar className="w-20 h-20 rounded-2xl border-4 border-white/20">
+              <div className="p-8 bg-primary text-white relative">
+                <div className="flex items-center gap-6">
+                  <Avatar className="w-24 h-24 rounded-3xl border-4 border-white/20 shadow-lg">
                     <AvatarImage src={selectedCustomer.imageUrl} />
-                    <AvatarFallback className="bg-white/20 text-white font-bold text-2xl">
+                    <AvatarFallback className="bg-white/20 text-white font-bold text-3xl">
                       {selectedCustomer.name.charAt(0)}
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <DialogTitle className="text-2xl font-bold text-white">{selectedCustomer.name}</DialogTitle>
-                    <p className="text-white/80 flex items-center gap-2 mt-1">
+                    <DialogTitle className="text-3xl font-black text-white">{selectedCustomer.name}</DialogTitle>
+                    <p className="text-white/80 flex items-center gap-2 mt-2 font-medium">
                       <Phone className="w-4 h-4" /> {selectedCustomer.phone}
                     </p>
                   </div>
                 </div>
+                {/* Decoration */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16" />
               </div>
 
-              <div className="flex-1 overflow-hidden p-6 space-y-6">
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="bg-secondary/50 p-4 rounded-2xl text-center">
-                    <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Total Value</p>
-                    <p className="text-lg font-black text-primary">₹{getCustomerStats(selectedCustomer.id).totalBilled}</p>
+              <div className="flex-1 overflow-y-auto p-8 space-y-8">
+                <div className="grid grid-cols-3 gap-6">
+                  <div className="bg-muted/30 p-5 rounded-[2rem] text-center border">
+                    <p className="text-[10px] uppercase font-black text-muted-foreground mb-1">Total Bill</p>
+                    <p className="text-xl font-black text-primary">₹{getCustomerStats(selectedCustomer.id).totalBilled}</p>
                   </div>
-                  <div className="bg-green-50 p-4 rounded-2xl text-center">
-                    <p className="text-[10px] uppercase font-bold text-green-600/70 mb-1">Total Paid</p>
-                    <p className="text-lg font-black text-green-600">₹{getCustomerStats(selectedCustomer.id).totalPaid}</p>
+                  <div className="bg-green-50 p-5 rounded-[2rem] text-center border border-green-100">
+                    <p className="text-[10px] uppercase font-black text-green-600/70 mb-1">Paid</p>
+                    <p className="text-xl font-black text-green-600">₹{getCustomerStats(selectedCustomer.id).totalPaid}</p>
                   </div>
-                  <div className={`p-4 rounded-2xl text-center ${getCustomerStats(selectedCustomer.id).balanceDue > 0 ? 'bg-amber-50' : 'bg-muted/30'}`}>
-                    <p className="text-[10px] uppercase font-bold text-amber-600/70 mb-1">Amount Due</p>
-                    <p className={`text-lg font-black ${getCustomerStats(selectedCustomer.id).balanceDue > 0 ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                  <div className={`p-5 rounded-[2rem] text-center border ${getCustomerStats(selectedCustomer.id).balanceDue > 0 ? 'bg-amber-50 border-amber-100' : 'bg-muted/20 border-border'}`}>
+                    <p className="text-[10px] uppercase font-black text-amber-600/70 mb-1">Balance</p>
+                    <p className={`text-xl font-black ${getCustomerStats(selectedCustomer.id).balanceDue > 0 ? 'text-amber-600' : 'text-muted-foreground'}`}>
                       ₹{getCustomerStats(selectedCustomer.id).balanceDue}
                     </p>
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <h4 className="font-bold flex items-center gap-2 text-primary">
-                      <ShoppingBag className="w-4 h-4" />
-                      Purchase History
-                    </h4>
-                    <Dialog open={isAddingItems} onOpenChange={setIsAddingItems}>
-                      <DialogTrigger asChild>
-                        <Button size="sm" className="rounded-lg h-8 gap-1 font-bold">
-                          <Plus className="w-3 h-3" /> Add Items
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-[500px] rounded-3xl">
-                        <DialogHeader>
-                          <DialogTitle className="text-xl font-bold">Add Items for {selectedCustomer.name}</DialogTitle>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                          <div className="grid grid-cols-2 gap-4">
-                            <ScrollArea className="h-56 border rounded-xl p-2">
-                              <Label className="px-2 pb-2 block text-[10px] uppercase font-bold text-muted-foreground">Product List</Label>
-                              {products?.map(p => (
-                                <div key={p.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/20 border mb-1 text-xs">
-                                  <span>{p.name}</span>
-                                  <Button size="sm" variant="ghost" onClick={() => handleAddItemToCart(p.id)} className="h-6 w-6 p-0 rounded-full">
-                                    <Plus className="w-3 h-3" />
-                                  </Button>
-                                </div>
-                              ))}
-                            </ScrollArea>
-                            <ScrollArea className="h-56 border rounded-xl p-2 bg-white">
-                              <Label className="px-2 pb-2 block text-[10px] uppercase font-bold text-muted-foreground">Current Selection</Label>
-                              {selectedItems.map(item => {
-                                const p = products?.find(prod => prod.id === item.productId)!;
-                                return (
-                                  <div key={item.productId} className="flex justify-between text-xs py-1 border-b">
-                                    <span>{p.name} (x{item.quantity})</span>
-                                    <span>₹{p.price * item.quantity}</span>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Purchase history */}
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h4 className="font-black flex items-center gap-2 text-primary text-sm uppercase tracking-widest">
+                        <ShoppingBag className="w-4 h-4" /> Products
+                      </h4>
+                      <Dialog open={isAddingItems} onOpenChange={setIsAddingItems}>
+                        <DialogTrigger asChild>
+                          <Button size="sm" className="rounded-xl h-9 gap-1 font-bold px-4">
+                            <Plus className="w-3 h-3" /> New Order
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[500px] rounded-3xl">
+                          <DialogHeader>
+                            <DialogTitle className="text-xl font-bold">Add Items for {selectedCustomer.name}</DialogTitle>
+                          </DialogHeader>
+                          <div className="grid gap-4 py-4">
+                            <div className="grid grid-cols-2 gap-4">
+                              <ScrollArea className="h-56 border rounded-xl p-2">
+                                <Label className="px-2 pb-2 block text-[10px] uppercase font-bold text-muted-foreground">Product List</Label>
+                                {products?.map(p => (
+                                  <div key={p.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/20 border mb-1 text-xs">
+                                    <span>{p.name}</span>
+                                    <Button size="sm" variant="ghost" onClick={() => handleAddItemToCart(p.id)} className="h-6 w-6 p-0 rounded-full">
+                                      <Plus className="w-3 h-3" />
+                                    </Button>
                                   </div>
-                                );
-                              })}
-                            </ScrollArea>
+                                ))}
+                              </ScrollArea>
+                              <ScrollArea className="h-56 border rounded-xl p-2 bg-white">
+                                <Label className="px-2 pb-2 block text-[10px] uppercase font-bold text-muted-foreground">Current Selection</Label>
+                                {selectedItems.map(item => {
+                                  const p = products?.find(prod => prod.id === item.productId)!;
+                                  return (
+                                    <div key={item.productId} className="flex justify-between text-xs py-1 border-b">
+                                      <span>{p.name} (x{item.quantity})</span>
+                                      <span>₹{p.price * item.quantity}</span>
+                                    </div>
+                                  );
+                                })}
+                              </ScrollArea>
+                            </div>
+                            <div className="flex justify-between items-center pt-2">
+                              <p className="font-bold text-lg">Total: ₹{calculateCartTotal()}</p>
+                              <Button onClick={() => handleAddMoreItems(selectedCustomer)} className="rounded-xl px-8 font-bold" disabled={selectedItems.length === 0}>
+                                Create Order
+                              </Button>
+                            </div>
                           </div>
-                          <div className="flex justify-between items-center pt-2">
-                            <p className="font-bold text-lg">Total: ₹{calculateCartTotal()}</p>
-                            <Button onClick={() => handleAddMoreItems(selectedCustomer)} className="rounded-xl px-8 font-bold" disabled={selectedItems.length === 0}>
-                              Update Order
-                            </Button>
-                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                    <ScrollArea className="h-[250px] rounded-[2rem] border p-4 bg-muted/10">
+                      {getCustomerStats(selectedCustomer.id).items.length > 0 ? (
+                        <div className="space-y-3">
+                          {getCustomerStats(selectedCustomer.id).items.map((item, idx) => (
+                            <div key={idx} className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-border/50">
+                              <div>
+                                <p className="font-black text-sm">{item.name}</p>
+                                <p className="text-[10px] text-muted-foreground font-bold uppercase">Qty: {item.quantity}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-black text-primary">₹{item.total}</p>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      </DialogContent>
-                    </Dialog>
+                      ) : (
+                        <div className="h-full flex flex-col items-center justify-center text-muted-foreground italic">
+                          <History className="w-8 h-8 mb-2 opacity-20" />
+                          <p className="text-xs font-bold uppercase">No products yet</p>
+                        </div>
+                      )}
+                    </ScrollArea>
                   </div>
-                  <ScrollArea className="h-[200px] rounded-2xl border p-4 bg-muted/10">
-                    {getCustomerStats(selectedCustomer.id).items.length > 0 ? (
-                      <div className="space-y-3">
-                        {getCustomerStats(selectedCustomer.id).items.map((item, idx) => (
-                          <div key={idx} className="flex justify-between items-center bg-white p-3 rounded-xl shadow-sm border border-border/50">
-                            <div>
-                              <p className="font-bold text-sm">{item.name}</p>
-                              <p className="text-xs text-muted-foreground">Quantity: {item.quantity}</p>
+
+                  {/* Payment Timeline */}
+                  <div className="space-y-4">
+                    <h4 className="font-black flex items-center gap-2 text-primary text-sm uppercase tracking-widest">
+                      <Calendar className="w-4 h-4" /> Payment History
+                    </h4>
+                    <ScrollArea className="h-[250px] rounded-[2rem] border p-4 bg-green-50/20">
+                      {getCustomerStats(selectedCustomer.id).paymentLogs.length > 0 ? (
+                        <div className="space-y-3">
+                          {getCustomerStats(selectedCustomer.id).paymentLogs.map((log, idx) => (
+                            <div key={idx} className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-green-100">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                                  <IndianRupee className="w-3 h-3 text-green-600" />
+                                </div>
+                                <div>
+                                  <p className="font-black text-green-600 text-sm">+ ₹{log.amount}</p>
+                                  <p className="text-[10px] text-muted-foreground font-bold uppercase">{new Date(log.date).toLocaleDateString()}</p>
+                                </div>
+                              </div>
                             </div>
-                            <div className="text-right">
-                              <p className="font-bold text-primary">₹{item.total}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="h-full flex flex-col items-center justify-center text-muted-foreground italic">
-                        <History className="w-8 h-8 mb-2 opacity-20" />
-                        <p className="text-sm">No items purchased.</p>
-                      </div>
-                    )}
-                  </ScrollArea>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="h-full flex flex-col items-center justify-center text-muted-foreground italic">
+                          <IndianRupee className="w-8 h-8 mb-2 opacity-20" />
+                          <p className="text-xs font-bold uppercase">No payments received</p>
+                        </div>
+                      )}
+                    </ScrollArea>
+                  </div>
                 </div>
               </div>
 
-              <div className="p-6 border-t bg-muted/30 flex justify-end">
-                <Button onClick={() => setSelectedCustomer(null)} className="rounded-xl px-8 font-bold">
-                  Close Profile
+              <div className="p-8 border-t bg-muted/20 flex justify-end">
+                <Button onClick={() => setSelectedCustomer(null)} className="rounded-2xl px-12 h-12 font-black shadow-lg">
+                  Done
                 </Button>
               </div>
             </>
