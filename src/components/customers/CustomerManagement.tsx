@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Customer, Transaction, TransactionItem } from '@/lib/storage';
+import { useState, useRef } from 'react';
+import { Customer, Transaction, Product } from '@/lib/storage';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,33 +10,117 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
-import { Plus, Search, Phone, UserPlus, User, ShoppingBag, IndianRupee, History } from 'lucide-react';
+import { Plus, Search, Phone, UserPlus, User, ShoppingBag, History, Upload, Calculator } from 'lucide-react';
 
 interface CustomerManagementProps {
   customers: Customer[];
   transactions: Transaction[];
+  products: Product[];
   onAddCustomer: (c: Customer) => void;
+  onAddTransaction: (t: Transaction) => void;
 }
 
-export function CustomerManagement({ customers, transactions, onAddCustomer }: CustomerManagementProps) {
+export function CustomerManagement({ 
+  customers, 
+  transactions, 
+  products,
+  onAddCustomer, 
+  onAddTransaction 
+}: CustomerManagementProps) {
   const [isAdding, setIsAdding] = useState(false);
+  const [addStep, setAddStep] = useState(1);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Registration State
   const [newCustomer, setNewCustomer] = useState<Partial<Customer>>({
     name: '',
     phone: '',
     imageUrl: '',
   });
+  const [selectedItems, setSelectedItems] = useState<{ productId: string, quantity: number }[]>([]);
 
-  const handleSave = () => {
+  // Add Items State for Existing Customer
+  const [isAddingItems, setIsAddingItems] = useState(false);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNewCustomer(prev => ({ ...prev, imageUrl: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAddItemToCart = (productId: string) => {
+    const existing = selectedItems.find(i => i.productId === productId);
+    if (existing) {
+      setSelectedItems(selectedItems.map(i => i.productId === productId ? { ...i, quantity: i.quantity + 1 } : i));
+    } else {
+      setSelectedItems([...selectedItems, { productId, quantity: 1 }]);
+    }
+  };
+
+  const calculateCartTotal = () => {
+    return selectedItems.reduce((acc, curr) => {
+      const p = products.find(prod => prod.id === curr.productId);
+      return acc + (p?.price || 0) * curr.quantity;
+    }, 0);
+  };
+
+  const handleFinalSave = () => {
+    const customerId = Math.random().toString(36).substr(2, 9);
     const customer: Customer = {
       ...newCustomer as Customer,
-      id: Math.random().toString(36).substr(2, 9),
+      id: customerId,
     };
     onAddCustomer(customer);
+
+    if (selectedItems.length > 0) {
+      const total = calculateCartTotal();
+      const transaction: Transaction = {
+        id: Math.random().toString(36).substr(2, 9),
+        customerId: customerId,
+        customerName: customer.name,
+        items: selectedItems.map(i => {
+          const p = products.find(prod => prod.id === i.productId)!;
+          return { productId: p.id, name: p.name, quantity: i.quantity, price: p.price };
+        }),
+        totalAmount: total,
+        paidAmount: 0, // Assume pending initially
+        status: 'pending',
+        date: new Date().toISOString(),
+      };
+      onAddTransaction(transaction);
+    }
+
     setIsAdding(false);
+    setAddStep(1);
     setNewCustomer({ name: '', phone: '', imageUrl: '' });
+    setSelectedItems([]);
+  };
+
+  const handleAddMoreItems = (customer: Customer) => {
+    const total = calculateCartTotal();
+    const transaction: Transaction = {
+      id: Math.random().toString(36).substr(2, 9),
+      customerId: customer.id,
+      customerName: customer.name,
+      items: selectedItems.map(i => {
+        const p = products.find(prod => prod.id === i.productId)!;
+        return { productId: p.id, name: p.name, quantity: i.quantity, price: p.price };
+      }),
+      totalAmount: total,
+      paidAmount: 0,
+      status: 'pending',
+      date: new Date().toISOString(),
+    };
+    onAddTransaction(transaction);
+    setIsAddingItems(false);
+    setSelectedItems([]);
   };
 
   const filtered = customers.filter(c => 
@@ -46,8 +130,6 @@ export function CustomerManagement({ customers, transactions, onAddCustomer }: C
 
   const getCustomerStats = (customerId: string) => {
     const customerTx = transactions.filter(t => t.customerId === customerId);
-    
-    // Aggregate all items purchased by this customer
     const itemsMap = new Map<string, { name: string; quantity: number; total: number }>();
     let totalBilled = 0;
     let totalPaid = 0;
@@ -84,45 +166,115 @@ export function CustomerManagement({ customers, transactions, onAddCustomer }: C
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-primary font-headline">Customers</h2>
-          <p className="text-muted-foreground">Manage relationships and view full purchase history.</p>
+          <p className="text-muted-foreground">Manage relationships and order history.</p>
         </div>
         <div className="flex gap-2 w-full md:w-auto">
           <div className="relative flex-1 md:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input 
-              placeholder="Search by name or phone..." 
+              placeholder="Search customers..." 
               className="pl-10 h-10 rounded-xl"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Dialog open={isAdding} onOpenChange={setIsAdding}>
+          <Dialog open={isAdding} onOpenChange={(val) => {
+            setIsAdding(val);
+            if (!val) setAddStep(1);
+          }}>
             <DialogTrigger asChild>
               <Button className="rounded-xl gap-2 font-bold shadow-lg shadow-primary/20">
                 <UserPlus className="w-5 h-5" />
                 New Customer
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px] rounded-3xl">
+            <DialogContent className="sm:max-w-[550px] rounded-3xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle className="text-2xl font-bold">Register Client</DialogTitle>
-                <DialogDescription>Add a new customer to your business directory.</DialogDescription>
+                <DialogTitle className="text-2xl font-bold">
+                  {addStep === 1 ? 'Register Client' : 'Select Initial Products'}
+                </DialogTitle>
+                <DialogDescription>
+                  {addStep === 1 ? 'Add a new customer to your business.' : `Select items for ${newCustomer.name}.`}
+                </DialogDescription>
               </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="cust_name">Full Name</Label>
-                  <Input id="cust_name" placeholder="John Smith" value={newCustomer.name} onChange={(e) => setNewCustomer({...newCustomer, name: e.target.value})} />
+              
+              {addStep === 1 ? (
+                <div className="grid gap-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="cust_name">Full Name</Label>
+                    <Input id="cust_name" placeholder="John Smith" value={newCustomer.name} onChange={(e) => setNewCustomer({...newCustomer, name: e.target.value})} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cust_phone">Phone Number</Label>
+                    <Input id="cust_phone" placeholder="+91 XXXXX XXXXX" value={newCustomer.phone} onChange={(e) => setNewCustomer({...newCustomer, phone: e.target.value})} />
+                  </div>
+                  <div className="space-y-2 text-center">
+                    <Label>Profile Picture</Label>
+                    <div className="flex flex-col items-center gap-2 pt-2">
+                      <div 
+                        className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center overflow-hidden border-2 border-dashed border-primary/30 hover:border-primary cursor-pointer"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        {newCustomer.imageUrl ? (
+                          <img src={newCustomer.imageUrl} alt="Profile" className="w-full h-full object-cover" />
+                        ) : (
+                          <Upload className="w-6 h-6 text-muted-foreground" />
+                        )}
+                      </div>
+                      <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
+                      <Input 
+                        placeholder="Or Image URL" 
+                        className="text-center text-xs" 
+                        value={newCustomer.imageUrl?.startsWith('data:') ? '' : newCustomer.imageUrl} 
+                        onChange={(e) => setNewCustomer({...newCustomer, imageUrl: e.target.value})} 
+                      />
+                    </div>
+                  </div>
+                  <Button onClick={() => setAddStep(2)} className="w-full h-12 rounded-xl font-bold mt-4" disabled={!newCustomer.name || !newCustomer.phone}>
+                    Next: Select Products
+                  </Button>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cust_phone">Phone Number</Label>
-                  <Input id="cust_phone" placeholder="+91 XXXXX XXXXX" value={newCustomer.phone} onChange={(e) => setNewCustomer({...newCustomer, phone: e.target.value})} />
+              ) : (
+                <div className="grid gap-6 py-4">
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-2">Inventory</Label>
+                      <ScrollArea className="h-64 border rounded-xl p-2 bg-muted/20">
+                        {products.map(p => (
+                          <div key={p.id} className="flex items-center justify-between p-2 rounded-lg bg-white border mb-2 text-sm">
+                            <span className="font-medium">{p.name} - ₹{p.price}</span>
+                            <Button size="sm" variant="ghost" onClick={() => handleAddItemToCart(p.id)} className="h-7 w-7 p-0 rounded-full hover:bg-primary hover:text-white">
+                              <Plus className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </ScrollArea>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Selected Items</Label>
+                      <ScrollArea className="h-64 border rounded-xl p-2 bg-white">
+                        {selectedItems.map(item => {
+                          const p = products.find(prod => prod.id === item.productId)!;
+                          return (
+                            <div key={item.productId} className="flex justify-between text-xs py-1 border-b mb-1">
+                              <span>{p.name} (x{item.quantity})</span>
+                              <span className="font-bold">₹{p.price * item.quantity}</span>
+                            </div>
+                          );
+                        })}
+                        {selectedItems.length === 0 && <p className="text-xs text-muted-foreground italic text-center pt-10">Cart is empty.</p>}
+                      </ScrollArea>
+                    </div>
+                  </div>
+                  <div className="pt-2 border-t flex justify-between items-center">
+                    <span className="font-bold text-lg text-primary">Total: ₹{calculateCartTotal()}</span>
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={() => setAddStep(1)} className="rounded-xl">Back</Button>
+                      <Button onClick={handleFinalSave} className="rounded-xl px-6 font-bold">Finish & Save</Button>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cust_img">Profile Image URL (Optional)</Label>
-                  <Input id="cust_img" placeholder="https://..." value={newCustomer.imageUrl} onChange={(e) => setNewCustomer({...newCustomer, imageUrl: e.target.value})} />
-                </div>
-              </div>
-              <Button onClick={handleSave} className="w-full h-12 rounded-xl font-bold" disabled={!newCustomer.name || !newCustomer.phone}>Register Customer</Button>
+              )}
             </DialogContent>
           </Dialog>
         </div>
@@ -135,7 +287,10 @@ export function CustomerManagement({ customers, transactions, onAddCustomer }: C
             <Card 
               key={customer.id} 
               className="rounded-2xl border-none shadow-sm hover:shadow-md transition-all cursor-pointer group"
-              onClick={() => setSelectedCustomer(customer)}
+              onClick={() => {
+                setSelectedCustomer(customer);
+                setSelectedItems([]);
+              }}
             >
               <CardContent className="p-6">
                 <div className="flex items-center gap-4">
@@ -150,7 +305,7 @@ export function CustomerManagement({ customers, transactions, onAddCustomer }: C
                       <h3 className="font-bold text-lg group-hover:text-primary transition-colors">{customer.name}</h3>
                       {stats.balanceDue > 0 && (
                         <Badge variant="destructive" className="text-[10px] h-5">
-                          PENDING: ₹{stats.balanceDue}
+                          DUE: ₹{stats.balanceDue}
                         </Badge>
                       )}
                     </div>
@@ -177,7 +332,7 @@ export function CustomerManagement({ customers, transactions, onAddCustomer }: C
         {filtered.length === 0 && (
           <div className="col-span-full flex flex-col items-center justify-center py-20 text-muted-foreground bg-white/50 rounded-3xl border-2 border-dashed border-muted">
             <User className="w-12 h-12 mb-4 opacity-20" />
-            <p className="text-lg">No customers found. Grow your network!</p>
+            <p className="text-lg">No customers found.</p>
           </div>
         )}
       </div>
@@ -206,7 +361,7 @@ export function CustomerManagement({ customers, transactions, onAddCustomer }: C
               <div className="flex-1 overflow-hidden p-6 space-y-6">
                 <div className="grid grid-cols-3 gap-4">
                   <div className="bg-secondary/50 p-4 rounded-2xl text-center">
-                    <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Total Spent</p>
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Total Value</p>
                     <p className="text-lg font-black text-primary">₹{getCustomerStats(selectedCustomer.id).totalBilled}</p>
                   </div>
                   <div className="bg-green-50 p-4 rounded-2xl text-center">
@@ -214,7 +369,7 @@ export function CustomerManagement({ customers, transactions, onAddCustomer }: C
                     <p className="text-lg font-black text-green-600">₹{getCustomerStats(selectedCustomer.id).totalPaid}</p>
                   </div>
                   <div className={`p-4 rounded-2xl text-center ${getCustomerStats(selectedCustomer.id).balanceDue > 0 ? 'bg-amber-50' : 'bg-muted/30'}`}>
-                    <p className="text-[10px] uppercase font-bold text-amber-600/70 mb-1">Balance Due</p>
+                    <p className="text-[10px] uppercase font-bold text-amber-600/70 mb-1">Amount Due</p>
                     <p className={`text-lg font-black ${getCustomerStats(selectedCustomer.id).balanceDue > 0 ? 'text-amber-600' : 'text-muted-foreground'}`}>
                       ₹{getCustomerStats(selectedCustomer.id).balanceDue}
                     </p>
@@ -222,11 +377,58 @@ export function CustomerManagement({ customers, transactions, onAddCustomer }: C
                 </div>
 
                 <div className="space-y-3">
-                  <h4 className="font-bold flex items-center gap-2 text-primary">
-                    <ShoppingBag className="w-4 h-4" />
-                    Product History
-                  </h4>
-                  <ScrollArea className="h-[250px] rounded-2xl border p-4 bg-muted/10">
+                  <div className="flex justify-between items-center">
+                    <h4 className="font-bold flex items-center gap-2 text-primary">
+                      <ShoppingBag className="w-4 h-4" />
+                      Purchase History
+                    </h4>
+                    <Dialog open={isAddingItems} onOpenChange={setIsAddingItems}>
+                      <DialogTrigger asChild>
+                        <Button size="sm" className="rounded-lg h-8 gap-1 font-bold">
+                          <Plus className="w-3 h-3" /> Add Items
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[500px] rounded-3xl">
+                        <DialogHeader>
+                          <DialogTitle className="text-xl font-bold">Add Items for {selectedCustomer.name}</DialogTitle>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            <ScrollArea className="h-56 border rounded-xl p-2">
+                              <Label className="px-2 pb-2 block text-[10px] uppercase font-bold text-muted-foreground">Product List</Label>
+                              {products.map(p => (
+                                <div key={p.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/20 border mb-1 text-xs">
+                                  <span>{p.name}</span>
+                                  <Button size="sm" variant="ghost" onClick={() => handleAddItemToCart(p.id)} className="h-6 w-6 p-0 rounded-full">
+                                    <Plus className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </ScrollArea>
+                            <ScrollArea className="h-56 border rounded-xl p-2 bg-white">
+                              <Label className="px-2 pb-2 block text-[10px] uppercase font-bold text-muted-foreground">Current Selection</Label>
+                              {selectedItems.map(item => {
+                                const p = products.find(prod => prod.id === item.productId)!;
+                                return (
+                                  <div key={item.productId} className="flex justify-between text-xs py-1 border-b">
+                                    <span>{p.name} (x{item.quantity})</span>
+                                    <span>₹{p.price * item.quantity}</span>
+                                  </div>
+                                );
+                              })}
+                            </ScrollArea>
+                          </div>
+                          <div className="flex justify-between items-center pt-2">
+                            <p className="font-bold text-lg">Total: ₹{calculateCartTotal()}</p>
+                            <Button onClick={() => handleAddMoreItems(selectedCustomer)} className="rounded-xl px-8 font-bold" disabled={selectedItems.length === 0}>
+                              Update Order
+                            </Button>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                  <ScrollArea className="h-[200px] rounded-2xl border p-4 bg-muted/10">
                     {getCustomerStats(selectedCustomer.id).items.length > 0 ? (
                       <div className="space-y-3">
                         {getCustomerStats(selectedCustomer.id).items.map((item, idx) => (
@@ -244,7 +446,7 @@ export function CustomerManagement({ customers, transactions, onAddCustomer }: C
                     ) : (
                       <div className="h-full flex flex-col items-center justify-center text-muted-foreground italic">
                         <History className="w-8 h-8 mb-2 opacity-20" />
-                        <p className="text-sm">No purchases recorded yet.</p>
+                        <p className="text-sm">No items purchased.</p>
                       </div>
                     )}
                   </ScrollArea>

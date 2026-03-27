@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Product } from '@/lib/storage';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, Image as ImageIcon, Sparkles, Loader2, Package } from 'lucide-react';
+import { Plus, Search, Image as ImageIcon, Sparkles, Loader2, Package, Upload } from 'lucide-react';
 import { aiProductDescriptionGenerator } from '@/ai/flows/ai-product-description-generator-flow';
 import { useToast } from '@/hooks/use-toast';
 
@@ -22,6 +22,7 @@ export function ProductManagement({ products, onAddProduct }: ProductManagementP
   const [isAdding, setIsAdding] = useState(false);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
   const [newProduct, setNewProduct] = useState<Partial<Product>>({
@@ -53,13 +54,23 @@ export function ProductManagement({ products, onAddProduct }: ProductManagementP
     } catch (e) {
       toast({ 
         title: "AI Service Unavailable", 
-        description: "Configure your API key in the environment variables to use AI features. Falling back to default description.", 
+        description: "Configure your API key to use AI features. Falling back to default.", 
         variant: "destructive" 
       });
-      // Graceful fallback for demo purposes if API key is missing
       setNewProduct(prev => ({ ...prev, description: `A high-quality ${prev.name || 'product'} perfect for your needs.` }));
     } finally {
       setIsGeneratingAI(false);
+    }
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNewProduct(prev => ({ ...prev, imageUrl: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -100,7 +111,7 @@ export function ProductManagement({ products, onAddProduct }: ProductManagementP
                 Add Item
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px] rounded-3xl">
+            <DialogContent className="sm:max-w-[600px] rounded-3xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="text-2xl font-bold flex items-center gap-2">
                   <Package className="w-6 h-6 text-primary" />
@@ -115,9 +126,41 @@ export function ProductManagement({ products, onAddProduct }: ProductManagementP
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="prod_price">Price (₹)</Label>
-                    <Input id="prod_price" type="number" value={newProduct.price} onChange={(e) => setNewProduct({...newProduct, price: parseFloat(e.target.value)})} />
+                    <Input id="prod_price" type="number" value={newProduct.price} onChange={(e) => setNewProduct({...newProduct, price: parseFloat(e.target.value) || 0})} />
                   </div>
                 </div>
+
+                <div className="space-y-2">
+                  <Label>Product Image</Label>
+                  <div className="flex items-center gap-4">
+                    <div 
+                      className="w-24 h-24 rounded-2xl bg-muted border-2 border-dashed flex items-center justify-center overflow-hidden cursor-pointer hover:border-primary transition-colors"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      {newProduct.imageUrl ? (
+                        <img src={newProduct.imageUrl} alt="Product preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <Upload className="w-6 h-6 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        className="hidden" 
+                        accept="image/*" 
+                        onChange={handleImageUpload} 
+                      />
+                      <Input 
+                        placeholder="Or paste Image URL" 
+                        value={newProduct.imageUrl?.startsWith('data:') ? '' : newProduct.imageUrl} 
+                        onChange={(e) => setNewProduct({...newProduct, imageUrl: e.target.value})}
+                        className="text-xs"
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <Label htmlFor="prod_desc">Description</Label>
@@ -140,15 +183,9 @@ export function ProductManagement({ products, onAddProduct }: ProductManagementP
                     onChange={(e) => setNewProduct({...newProduct, description: e.target.value})}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="prod_cat">Category</Label>
-                    <Input id="prod_cat" placeholder="e.g. Apparel" value={newProduct.category} onChange={(e) => setNewProduct({...newProduct, category: e.target.value})} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="prod_img">Image URL</Label>
-                    <Input id="prod_img" placeholder="https://..." value={newProduct.imageUrl} onChange={(e) => setNewProduct({...newProduct, imageUrl: e.target.value})} />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="prod_cat">Category</Label>
+                  <Input id="prod_cat" placeholder="e.g. Apparel" value={newProduct.category} onChange={(e) => setNewProduct({...newProduct, category: e.target.value})} />
                 </div>
               </div>
               <Button onClick={handleSave} className="w-full h-12 rounded-xl font-bold" disabled={!newProduct.name}>Save Product</Button>

@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { BusinessInfo } from '@/lib/storage';
-import { Building2, User, MapPin, Camera, Sparkles } from 'lucide-react';
+import { Building2, User, MapPin, Camera, Sparkles, Upload } from 'lucide-react';
 
 interface OnboardingModalProps {
   onComplete: (info: BusinessInfo) => void;
@@ -14,6 +14,7 @@ interface OnboardingModalProps {
 
 export function OnboardingModal({ onComplete }: OnboardingModalProps) {
   const [step, setStep] = useState(1);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState<Partial<BusinessInfo>>({
     name: '',
     owner: '',
@@ -25,6 +26,17 @@ export function OnboardingModal({ onComplete }: OnboardingModalProps) {
   const handleNext = () => {
     if (step < 2) setStep(step + 1);
     else onComplete(formData as BusinessInfo);
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData({ ...formData, profileImage: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   return (
@@ -93,23 +105,34 @@ export function OnboardingModal({ onComplete }: OnboardingModalProps) {
                 <Label className="text-sm font-semibold flex items-center justify-center gap-2">
                   <Camera className="w-4 h-4 text-primary" /> Business Profile Image
                 </Label>
-                <div className="flex justify-center pt-4">
-                  <div className="relative group cursor-pointer">
-                    <div className="w-32 h-32 rounded-3xl bg-muted flex items-center justify-center overflow-hidden border-2 border-dashed border-primary/30 group-hover:border-primary transition-colors">
-                      {formData.profileImage ? (
-                        <img src={formData.profileImage} alt="Preview" className="w-full h-full object-cover" />
-                      ) : (
-                        <Camera className="w-8 h-8 text-muted-foreground" />
-                      )}
-                    </div>
-                    <Input 
-                      type="text" 
-                      placeholder="Paste image URL (optional)" 
-                      className="mt-4 text-center text-xs" 
-                      value={formData.profileImage} 
-                      onChange={(e) => setFormData({ ...formData, profileImage: e.target.value })}
-                    />
+                <div className="flex flex-col items-center gap-4 pt-4">
+                  <div 
+                    className="w-32 h-32 rounded-3xl bg-muted flex items-center justify-center overflow-hidden border-2 border-dashed border-primary/30 hover:border-primary transition-colors cursor-pointer group relative"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    {formData.profileImage ? (
+                      <img src={formData.profileImage} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="flex flex-col items-center gap-1">
+                        <Upload className="w-8 h-8 text-muted-foreground group-hover:text-primary transition-colors" />
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold">Upload Image</span>
+                      </div>
+                    )}
                   </div>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    className="hidden" 
+                    accept="image/*" 
+                    onChange={handleImageUpload} 
+                  />
+                  <Input 
+                    type="text" 
+                    placeholder="Or paste image URL" 
+                    className="text-center text-xs h-10" 
+                    value={formData.profileImage?.startsWith('data:') ? '' : formData.profileImage} 
+                    onChange={(e) => setFormData({ ...formData, profileImage: e.target.value })}
+                  />
                 </div>
               </div>
               <p className="text-sm text-muted-foreground">This image will represent your brand across the platform.</p>
