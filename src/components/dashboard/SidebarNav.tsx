@@ -5,7 +5,8 @@ import {
   Package, 
   Users, 
   History, 
-  Download
+  Download,
+  Settings
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,7 @@ export function SidebarNav({ activeTab, setActiveTab }: SidebarNavProps) {
     { id: 'products', label: 'Products', icon: Package },
     { id: 'customers', label: 'Customers', icon: Users },
     { id: 'transactions', label: 'Transactions', icon: History },
+    { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
   return (

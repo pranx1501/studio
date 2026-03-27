@@ -6,11 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Search, Phone, UserPlus, User, ShoppingBag, History, Upload, IndianRupee, Calendar } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Plus, Search, Phone, UserPlus, User, ShoppingBag, History, Upload, IndianRupee, Calendar, CreditCard } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface CustomerManagementProps {
@@ -19,6 +20,7 @@ interface CustomerManagementProps {
   products: Product[];
   onAddCustomer: (c: Customer) => void;
   onAddTransaction: (t: Transaction) => void;
+  onUpdateTransaction: (t: Transaction) => void;
 }
 
 export function CustomerManagement({ 
@@ -26,12 +28,17 @@ export function CustomerManagement({
   transactions, 
   products,
   onAddCustomer, 
-  onAddTransaction 
+  onAddTransaction,
+  onUpdateTransaction
 }: CustomerManagementProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [addStep, setAddStep] = useState(1);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isPaymentActionOpen, setIsPaymentActionOpen] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState<string>('');
+  const [isFullPaymentSettled, setIsFullPaymentSettled] = useState(false);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
@@ -133,6 +140,55 @@ export function CustomerManagement({
     setIsAddingItems(false);
     setSelectedItems([]);
     toast({ title: "Items Added", description: `New order tracked for ${customer.name}.` });
+  };
+
+  const handleRecordPayment = () => {
+    if (!selectedCustomer) return;
+    
+    const customerTransactions = transactions
+      .filter(t => t.customerId === selectedCustomer.id && t.status === 'pending')
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    if (isFullPaymentSettled) {
+      customerTransactions.forEach(tx => {
+        const due = tx.totalAmount - tx.paidAmount;
+        if (due > 0) {
+          const updatedTx: Transaction = {
+            ...tx,
+            paidAmount: tx.totalAmount,
+            paymentHistory: [...(tx.paymentHistory || []), { amount: due, date: new Date().toISOString() }],
+            status: 'paid'
+          };
+          onUpdateTransaction(updatedTx);
+        }
+      });
+      toast({ title: "Payment Settled", description: `All outstanding dues cleared for ${selectedCustomer.name}.` });
+    } else {
+      let amountLeft = parseFloat(paymentAmount) || 0;
+      if (amountLeft <= 0) return;
+
+      const initialAmount = amountLeft;
+      for (const tx of customerTransactions) {
+        if (amountLeft <= 0) break;
+        
+        const due = tx.totalAmount - tx.paidAmount;
+        const paymentToApply = Math.min(amountLeft, due);
+        
+        const updatedTx: Transaction = {
+          ...tx,
+          paidAmount: tx.paidAmount + paymentToApply,
+          paymentHistory: [...(tx.paymentHistory || []), { amount: paymentToApply, date: new Date().toISOString() }],
+          status: (tx.paidAmount + paymentToApply) >= tx.totalAmount ? 'paid' : 'pending'
+        };
+        onUpdateTransaction(updatedTx);
+        amountLeft -= paymentToApply;
+      }
+      toast({ title: "Payment Recorded", description: `₹${initialAmount} applied to ${selectedCustomer.name}'s account.` });
+    }
+
+    setIsPaymentActionOpen(false);
+    setPaymentAmount('');
+    setIsFullPaymentSettled(false);
   };
 
   const filtered = customers.filter(c => 
@@ -357,19 +413,30 @@ export function CustomerManagement({
           {selectedCustomer && (
             <>
               <div className="p-8 bg-primary text-white relative">
-                <div className="flex items-center gap-6">
-                  <Avatar className="w-24 h-24 rounded-3xl border-4 border-white/20 shadow-lg">
-                    <AvatarImage src={selectedCustomer.imageUrl} />
-                    <AvatarFallback className="bg-white/20 text-white font-bold text-3xl">
-                      {selectedCustomer.name.charAt(0)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <DialogTitle className="text-3xl font-black text-white">{selectedCustomer.name}</DialogTitle>
-                    <p className="text-white/80 flex items-center gap-2 mt-2 font-medium">
-                      <Phone className="w-4 h-4" /> {selectedCustomer.phone}
-                    </p>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                  <div className="flex items-center gap-6">
+                    <Avatar className="w-24 h-24 rounded-3xl border-4 border-white/20 shadow-lg">
+                      <AvatarImage src={selectedCustomer.imageUrl} />
+                      <AvatarFallback className="bg-white/20 text-white font-bold text-3xl">
+                        {selectedCustomer.name.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <DialogTitle className="text-3xl font-black text-white">{selectedCustomer.name}</DialogTitle>
+                      <p className="text-white/80 flex items-center gap-2 mt-2 font-medium">
+                        <Phone className="w-4 h-4" /> {selectedCustomer.phone}
+                      </p>
+                    </div>
                   </div>
+                  
+                  {/* Payment Action Button */}
+                  <Button 
+                    className="bg-white text-primary hover:bg-white/90 rounded-2xl px-6 font-black h-12 shadow-lg gap-2"
+                    onClick={() => setIsPaymentActionOpen(true)}
+                  >
+                    <CreditCard className="w-5 h-5" />
+                    Payment Action
+                  </Button>
                 </div>
                 {/* Decoration */}
                 <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16" />
@@ -510,6 +577,55 @@ export function CustomerManagement({
               </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment Action Dialog */}
+      <Dialog open={isPaymentActionOpen} onOpenChange={setIsPaymentActionOpen}>
+        <DialogContent className="sm:max-w-[400px] rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black">Record Payment</DialogTitle>
+            <DialogDescription>
+              Record a partial or full payment for {selectedCustomer?.name}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-6 space-y-6">
+            <div className="space-y-2">
+              <Label className="text-xs font-black uppercase text-muted-foreground">Amount Received (₹)</Label>
+              <Input 
+                type="number" 
+                placeholder="Enter amount..." 
+                className="h-14 text-2xl font-black rounded-2xl border-primary/20 text-primary"
+                value={paymentAmount}
+                onChange={(e) => setPaymentAmount(e.target.value)}
+                disabled={isFullPaymentSettled}
+              />
+            </div>
+            
+            <div className="flex items-center space-x-3 p-4 bg-muted/30 rounded-2xl border">
+              <Checkbox 
+                id="full_payment" 
+                checked={isFullPaymentSettled} 
+                onCheckedChange={(val) => setIsFullPaymentSettled(!!val)}
+              />
+              <div className="grid gap-1.5 leading-none">
+                <Label htmlFor="full_payment" className="text-sm font-bold leading-none cursor-pointer">
+                  Full Payment Settled
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Marks all pending orders as paid.
+                </p>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="sm:justify-between gap-3">
+            <Button variant="outline" className="rounded-xl flex-1 h-12 font-bold" onClick={() => setIsPaymentActionOpen(false)}>
+              Cancel
+            </Button>
+            <Button className="rounded-xl flex-1 h-12 font-black shadow-lg" onClick={handleRecordPayment}>
+              Save Payment
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
